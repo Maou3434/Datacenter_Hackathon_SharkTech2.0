@@ -1,3 +1,4 @@
 dc_env/
-data/raw/
+output/
 */__pycache__
+data/raw/*
