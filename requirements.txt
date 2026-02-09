@@ -1,0 +1,10 @@
+numpy
+pandas
+rasterio
+rioxarray
+xarray
+scikit-learn
+matplotlib
+streamlit
+pyproj
+shapely
