@@ -61,3 +61,57 @@ plot_heatmap(
     cmap="magma"
 )
 
+# 5. Export for Frontend
+import json
+
+# Get coordinates for the downsampled grid
+h_sub, w_sub = composite_vis.shape
+# Re-calculate lats/lons for the downsampled grid if necessary or just use the indices
+# For simplicity in this hackathon, we'll export a list of records
+
+print("Exporting data for frontend...")
+data_points = []
+for r in range(h_sub):
+    for c in range(w_sub):
+        val = composite_vis[r, c]
+        if np.isnan(val):
+            continue
+            
+        # Map indices back to lat/lng (approximate for display)
+        # Using the same logic as visualize.py but simpler
+        lat = lats[r * stride]
+        lng = lons[c * stride]
+        
+        # Calculate some pseudo-scores for fields we haven't integrated yet
+        # In a real environment, these would come from specific datasets
+        renewable_val = np.random.uniform(30, 90)
+        water_val = np.random.uniform(40, 85)
+        terrain_val = 80 if np.random.random() > 0.2 else 40 # Mostly flat
+        infra_val = 50 + (pop[r, c] / 5000 * 40) if not np.isnan(pop[r, c]) else 30
+        
+        data_points.append({
+            "lat": float(lat),
+            "lng": float(lng),
+            "suitability": float(val),
+            "temperature": float(t_avg[r, c]),
+            "populationDensity": "high" if pop[r, c] > 1000 else "medium" if pop[r, c] > 100 else "low",
+            "solarPotential": "high" if renewable_val > 70 else "medium" if renewable_val > 40 else "low",
+            "waterStress": "high" if water_val < 50 else "medium" if water_val < 70 else "low",
+            "terrain": "flat" if terrain_val > 70 else "hilly" if terrain_val > 40 else "mountainous",
+            "scores": {
+                "environmental": float(temp_suit[r, c] * 100),
+                "population": float(pop_suit[r, c] * 100),
+                "renewable": float(renewable_val),
+                "water": float(water_val),
+                "terrain": float(terrain_val),
+                "infrastructure": float(min(100, infra_val))
+            }
+        })
+
+# Ensure directory exists
+os.makedirs("frontend/public/data", exist_ok=True)
+with open("frontend/public/data/heatmap.json", "w") as f:
+    json.dump(data_points, f)
+
+print(f"Exported {len(data_points)} points to frontend/public/data/heatmap.json")
+
