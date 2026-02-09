@@ -109,16 +109,58 @@ export function calculateSuitability(
   return { ...location, suitability, excluded: false };
 }
 
-export function getSuitabilityColor(suitability: number, excluded: boolean): string {
-  if (excluded) return '#AEB7B3'; // Medium gray
+// Magma Colormap Stops (approximation of Matplotlib's magma)
+const MAGMA_STOPS = [
+  { p: 0.0, c: '#000004' },
+  { p: 0.2, c: '#3b0f70' },
+  { p: 0.4, c: '#8c2981' },
+  { p: 0.6, c: '#de4968' },
+  { p: 0.8, c: '#fe9f6d' },
+  { p: 1.0, c: '#fcfdbf' }
+];
 
-  if (suitability >= 0.8) return '#2F4B26'; // Dark green
-  if (suitability >= 0.7) return '#3d6133'; // Medium green
-  if (suitability >= 0.6) return '#4a7640'; // Light green
-  if (suitability >= 0.5) return '#8b9d83'; // Pale green
-  if (suitability >= 0.4) return '#c4a853'; // Yellow-green
-  if (suitability >= 0.3) return '#d4954e'; // Orange
-  return '#c97153'; // Red-orange
+function hexToRgb(hex: string) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : { r: 0, g: 0, b: 0 };
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return "#" + ((1 << 24) + (Math.round(r) << 16) + (Math.round(g) << 8) + Math.round(b)).toString(16).slice(1);
+}
+
+export function getSuitabilityColor(suitability: number, excluded: boolean): string {
+  if (excluded) return '#AEB7B3';
+
+  // Clamping to [0, 1]
+  const val = Math.max(0, Math.min(1, suitability));
+
+  // Find the two stops to interpolate between
+  let lower = MAGMA_STOPS[0];
+  let upper = MAGMA_STOPS[MAGMA_STOPS.length - 1];
+
+  for (let i = 0; i < MAGMA_STOPS.length - 1; i++) {
+    if (val >= MAGMA_STOPS[i].p && val <= MAGMA_STOPS[i + 1].p) {
+      lower = MAGMA_STOPS[i];
+      upper = MAGMA_STOPS[i + 1];
+      break;
+    }
+  }
+
+  const range = upper.p - lower.p;
+  const t = range === 0 ? 0 : (val - lower.p) / range;
+
+  const c1 = hexToRgb(lower.c);
+  const c2 = hexToRgb(upper.c);
+
+  return rgbToHex(
+    c1.r + (c2.r - c1.r) * t,
+    c1.g + (c2.g - c1.g) * t,
+    c1.b + (c2.b - c1.b) * t
+  );
 }
 
 export function getScenarioDescription(weights: WeightFactors): string {

@@ -89,22 +89,12 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
       }
 
       const color = getSuitabilityColor(location.suitability, false);
-      const baseRadius = 40;
-      const radius = baseRadius * Math.pow(1.5, zoom - 2);
 
-      // Create radial gradient
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      // Calculate pixel size based on zoom for a "tightly knit" look
+      const size = Math.max(1, Math.min(4, 1.5 * Math.pow(1.2, zoom - 2)));
 
-      // Opacity based on suitability (clamped)
-      const opacity = Math.max(0.4, Math.min(1, location.suitability * 0.8));
-      const alphaHex = Math.floor(opacity * 255).toString(16).padStart(2, '0');
-
-      gradient.addColorStop(0, color + alphaHex);
-      gradient.addColorStop(0.4, color + Math.floor(opacity * 180).toString(16).padStart(2, '0'));
-      gradient.addColorStop(1, color + '00');
-
-      ctx.fillStyle = gradient;
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      ctx.fillStyle = color;
+      ctx.fillRect(x - size / 2, y - size / 2, size, size);
     });
   }, [data, dimensions, center, zoom]);
 
@@ -189,7 +179,7 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
         Math.pow(pos.x - mouseX, 2) + Math.pow(pos.y - mouseY, 2)
       );
 
-      const detectionRadius = 30 * Math.pow(1.5, zoom - 2);
+      const detectionRadius = 25 * Math.pow(1.3, zoom - 2);
 
       if (distance < detectionRadius && distance < minDistance) {
         closestPoint = location;
@@ -256,8 +246,8 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
         height={dimensions.height}
         className="absolute inset-0 w-full h-full"
         style={{
-          mixBlendMode: 'multiply',
-          opacity: 0.7,
+          mixBlendMode: 'normal',
+          opacity: 1,
           pointerEvents: 'none'
         }}
       />
@@ -338,32 +328,32 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-6 right-6 bg-[#160C28] border border-[#2F4B26]/30 rounded-xl p-4 shadow-xl z-[500] backdrop-blur-xl">
+      <div className="absolute bottom-6 right-6 bg-[#160C28]/90 border border-[#2F4B26]/30 rounded-xl p-4 shadow-xl z-[500] backdrop-blur-xl">
         <h4 className="font-bold text-sm mb-3 text-[#E1EFE6]">Suitability</h4>
-        <div className="w-12 h-0.5 bg-[#2F4B26] mb-3 rounded-full" />
+        <div className="w-12 h-0.5 bg-[#fcfdbf] mb-3 rounded-full" />
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm border border-[#2F4B26]/20" style={{ backgroundColor: '#2F4B26' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">High 80-100%</span>
+            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#fcfdbf' }}></div>
+            <span className="text-xs font-semibold text-[#AEB7B3]">High (≥80%)</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm border border-[#2F4B26]/20" style={{ backgroundColor: '#4a7640' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Good 60-80%</span>
+            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#fe9f6d' }}></div>
+            <span className="text-xs font-semibold text-[#AEB7B3]">Good (60-80%)</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm border border-[#2F4B26]/20" style={{ backgroundColor: '#8b9d83' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Moderate 50-60%</span>
+            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#de4968' }}></div>
+            <span className="text-xs font-semibold text-[#AEB7B3]">Moderate (50-60%)</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm border border-[#2F4B26]/20" style={{ backgroundColor: '#d4954e' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Low 30-50%</span>
+            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#8c2981' }}></div>
+            <span className="text-xs font-semibold text-[#AEB7B3]">Low (30-50%)</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm border border-[#2F4B26]/20" style={{ backgroundColor: '#c97153' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Poor &lt;30%</span>
+            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#3b0f70' }}></div>
+            <span className="text-xs font-semibold text-[#AEB7B3]">Poor (&lt;30%)</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm border border-[#2F4B26]/20" style={{ backgroundColor: '#AEB7B3' }}></div>
+            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#AEB7B3' }}></div>
             <span className="text-xs font-semibold text-[#AEB7B3]">Excluded</span>
           </div>
         </div>
