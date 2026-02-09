@@ -1,2 +1,3 @@
 dc_env/
 data/raw/
+*/__pycache__
