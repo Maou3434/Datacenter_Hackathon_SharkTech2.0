@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Building2, TrendingDown, AlertCircle, ShoppingCart, ArrowUpDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Building2, TrendingDown, AlertCircle, ShoppingCart, ArrowUpDown, LogIn, LogOut, Plus } from 'lucide-react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -7,6 +7,9 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Alert, AlertDescription } from './ui/alert';
+import { useAuth, UserRole } from '../context/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
+import { Label } from './ui/label';
 
 interface Seller {
   id: string;
@@ -24,7 +27,7 @@ interface RegionData {
   sellers: Seller[];
 }
 
-const regionsData: Record<string, RegionData> = {
+const INITIAL_REGIONS_DATA: Record<string, RegionData> = {
   'northern-europe': {
     name: 'Northern Europe',
     totalCap: 125000,
@@ -82,21 +85,32 @@ const regionsData: Record<string, RegionData> = {
 };
 
 export default function CarbonMarketplace() {
+  const { user, login, logout, isAuthenticated } = useAuth();
+  const [regions, setRegions] = useState<Record<string, RegionData>>(INITIAL_REGIONS_DATA);
   const [selectedRegion, setSelectedRegion] = useState<string>('northern-europe');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [sortBy, setSortBy] = useState<'price' | 'quantity'>('price');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  
+  // Publish form state
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [publishForm, setPublishForm] = useState({
+    allowances: '',
+    price: ''
+  });
 
-  const regionData = regionsData[selectedRegion];
+  const regionData = regions[selectedRegion];
   const utilizationPercentage = ((regionData.totalCap - regionData.remainingAllowances) / regionData.totalCap) * 100;
 
-  const sortedSellers = [...regionData.sellers].sort((a, b) => {
-    const multiplier = sortOrder === 'asc' ? 1 : -1;
-    if (sortBy === 'price') {
-      return (a.pricePerTon - b.pricePerTon) * multiplier;
-    }
-    return (a.allowancesAvailable - b.allowancesAvailable) * multiplier;
-  });
+  const sortedSellers = useMemo(() => {
+    return [...regionData.sellers].sort((a, b) => {
+      const multiplier = sortOrder === 'asc' ? 1 : -1;
+      if (sortBy === 'price') {
+        return (a.pricePerTon - b.pricePerTon) * multiplier;
+      }
+      return (a.allowancesAvailable - b.allowancesAvailable) * multiplier;
+    });
+  }, [regionData.sellers, sortBy, sortOrder]);
 
   const handleQuantityChange = (sellerId: string, value: string) => {
     const numValue = parseFloat(value) || 0;
@@ -119,8 +133,58 @@ export default function CarbonMarketplace() {
   const handlePurchase = (seller: Seller) => {
     const quantity = quantities[seller.id] || 0;
     if (quantity > 0 && quantity <= seller.allowancesAvailable) {
-      // In a real implementation, this would process the purchase
-      alert(`Purchase initiated:\n\nSeller: ${seller.businessName}\nQuantity: ${formatNumber(quantity)} tons CO₂\nTotal Cost: ₹${formatNumber(quantity * seller.pricePerTon)}\n\nThis is a simulated marketplace for planning purposes.`);
+      setRegions(prev => {
+        const next = { ...prev };
+        const region = { ...next[selectedRegion] };
+        const sellers = [...region.sellers];
+        const sellerIndex = sellers.findIndex(s => s.id === seller.id);
+        
+        if (sellerIndex > -1) {
+          sellers[sellerIndex] = {
+            ...sellers[sellerIndex],
+            allowancesAvailable: sellers[sellerIndex].allowancesAvailable - quantity
+          };
+          region.sellers = sellers;
+          region.remainingAllowances = region.remainingAllowances - quantity;
+          next[selectedRegion] = region;
+        }
+        return next;
+      });
+
+      // Reset quantity input
+      setQuantities(prev => ({ ...prev, [seller.id]: 0 }));
+      
+      alert(`Success! Purchase of ${formatNumber(quantity)} tons CO₂ from ${seller.businessName} complete.`);
+    }
+  };
+
+  const handlePublish = () => {
+    const allowancesNum = parseFloat(publishForm.allowances);
+    const priceNum = parseFloat(publishForm.price);
+
+    if (allowancesNum > 0 && priceNum > 0 && user?.businessName) {
+      setRegions(prev => {
+        const next = { ...prev };
+        const region = { ...next[selectedRegion] };
+        
+        // Use a stable ID if possible, but random is fine for this hackathon
+        const newSeller: Seller = {
+          id: `new-${Date.now()}`,
+          businessName: user!.businessName,
+          industry: 'Industrial/Tech', 
+          allowancesAvailable: allowancesNum,
+          pricePerTon: priceNum
+        };
+
+        region.sellers = [...region.sellers, newSeller];
+        region.remainingAllowances += allowancesNum;
+        region.totalCap += allowancesNum;
+        next[selectedRegion] = region;
+        return next;
+      });
+      
+      setIsPublishModalOpen(false);
+      setPublishForm({ allowances: '', price: '' });
     }
   };
 
@@ -128,41 +192,133 @@ export default function CarbonMarketplace() {
     <div className="h-full overflow-y-auto bg-[#000411] p-8">
       <div className="max-w-[1600px] mx-auto space-y-8">
         {/* Header */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#2F4B26]/30 flex items-center justify-center shadow-[0_0_20px_rgba(47,75,38,0.3)]">
-              <Building2 className="w-6 h-6 text-[#2F4B26]" />
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-[#2F4B26]/30 flex items-center justify-center shadow-[0_0_20px_rgba(47,75,38,0.3)]">
+                <Building2 className="w-6 h-6 text-[#2F4B26]" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold text-[#E1EFE6] tracking-tight">Carbon Allowance Marketplace</h1>
+                <p className="text-[#AEB7B3] mt-1">Fixed-price trading platform for regional carbon allowances</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-bold text-[#E1EFE6] tracking-tight">Carbon Allowance Marketplace</h1>
-              <p className="text-[#AEB7B3] mt-1">Fixed-price trading platform for regional carbon allowances</p>
-            </div>
+            
+            <Alert className="bg-[#160C28]/60 border-[#2F4B26]/30 backdrop-blur-sm">
+              <AlertCircle className="h-4 w-4 text-[#2F4B26]" />
+              <AlertDescription className="text-[#AEB7B3] text-sm">
+                This is a simulated marketplace for planning and evaluation purposes. Data represents modeled regional carbon markets to help data center planners assess carbon costs during site selection.
+              </AlertDescription>
+            </Alert>
           </div>
-          
-          <Alert className="bg-[#160C28]/60 border-[#2F4B26]/30 backdrop-blur-sm">
-            <AlertCircle className="h-4 w-4 text-[#2F4B26]" />
-            <AlertDescription className="text-[#AEB7B3] text-sm">
-              This is a simulated marketplace for planning and evaluation purposes. Data represents modeled regional carbon markets to help data center planners assess carbon costs during site selection.
-            </AlertDescription>
-          </Alert>
+
+          <div className="flex flex-wrap gap-3 items-center">
+            {!isAuthenticated ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => login('buyer')}
+                  className="border-[#2F4B26]/40 text-[#E1EFE6] hover:bg-[#2F4B26]/20"
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Mock Login: Buyer
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => login('business', 'biz-1', 'Business Owner', 'EcoTech Solutions')}
+                  className="border-[#2F4B26]/40 text-[#E1EFE6] hover:bg-[#2F4B26]/20"
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Mock Login: Business
+                </Button>
+              </>
+            ) : (
+              <div className="flex items-center gap-4 bg-[#160C28]/60 p-2 pl-4 rounded-lg border border-[#2F4B26]/20">
+                <div className="text-right">
+                  <div className="text-xs text-[#AEB7B3] uppercase font-bold tracking-tighter">Logged in as</div>
+                  <div className="text-[#E1EFE6] font-medium leading-tight">{user?.name} ({user?.role})</div>
+                </div>
+                <Button size="icon" variant="ghost" onClick={logout} className="text-[#AEB7B3] hover:text-white">
+                  <LogOut className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
+            
+            {user?.role === 'business' && (
+              <Dialog open={isPublishModalOpen} onOpenChange={setIsPublishModalOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-[#2F4B26] hover:bg-[#3d6133] text-[#E1EFE6] shadow-lg shadow-[#2F4B26]/20">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Publish Allowances
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-[#160C28] border-[#2F4B26]/40 text-[#E1EFE6]">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold">Publish New Allowances</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-6 py-4">
+                    <div className="p-4 bg-[#2F4B26]/10 border border-[#2F4B26]/30 rounded-lg">
+                      <div className="text-xs text-[#AEB7B3] uppercase font-bold tracking-wider mb-1">Publishing as</div>
+                      <div className="text-lg font-bold text-[#E1EFE6]">{user?.businessName}</div>
+                      <div className="text-xs text-[#AEB7B3]">Industry: Industrial/Tech</div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="allowances">Additional Quantity (tons)</Label>
+                        <Input 
+                          id="allowances" 
+                          type="number" 
+                          placeholder="e.g. 500"
+                          value={publishForm.allowances}
+                          onChange={e => setPublishForm({...publishForm, allowances: e.target.value})}
+                          className="bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6]"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="price">Sale Price (₹/ton)</Label>
+                        <Input 
+                          id="price" 
+                          type="number" 
+                          placeholder="e.g. 7500"
+                          value={publishForm.price}
+                          onChange={e => setPublishForm({...publishForm, price: e.target.value})}
+                          className="bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsPublishModalOpen(false)} className="border-[#2F4B26]/40">Cancel</Button>
+                    <Button onClick={handlePublish} className="bg-[#2F4B26] hover:bg-[#3d6133]">Confirm & List Allowances</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </div>
 
         {/* Region Selection */}
         <Card className="bg-[#160C28]/80 border-[#2F4B26]/30 p-6 backdrop-blur-xl">
           <div className="space-y-4">
             <label className="text-sm text-[#AEB7B3] uppercase tracking-wider font-semibold">Select Region</label>
-            <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-              <SelectTrigger className="w-full max-w-md bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6] focus:ring-[#2F4B26] focus:border-[#2F4B26]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-[#160C28] border-[#2F4B26]/40 text-[#E1EFE6]">
-                {Object.entries(regionsData).map(([key, data]) => (
-                  <SelectItem key={key} value={key} className="hover:bg-[#2F4B26]/20 focus:bg-[#2F4B26]/20 focus:text-[#E1EFE6]">
-                    {data.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-4 items-center">
+              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                <SelectTrigger className="w-full max-w-md bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6] focus:ring-[#2F4B26] focus:border-[#2F4B26]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-[#160C28] border-[#2F4B26]/40 text-[#E1EFE6]">
+                  {Object.entries(regions).map(([key, data]) => (
+                    <SelectItem key={key} value={key} className="hover:bg-[#2F4B26]/20 focus:bg-[#2F4B26]/20 focus:text-[#E1EFE6]">
+                      {data.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Badge variant="outline" className="h-10 px-4 border-[#2F4B26]/30 text-[#AEB7B3] items-center flex">
+                 Region Market Active
+              </Badge>
+            </div>
           </div>
         </Card>
 
@@ -314,14 +470,19 @@ export default function CarbonMarketplace() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          onClick={() => handlePurchase(seller)}
-                          disabled={!isValidQuantity}
-                          className="bg-[#2F4B26] hover:bg-[#3d6133] text-[#E1EFE6] disabled:opacity-40 disabled:cursor-not-allowed gap-2 shadow-lg hover:shadow-[0_0_20px_rgba(47,75,38,0.4)] transition-all"
-                        >
-                          <ShoppingCart className="w-4 h-4" />
-                          Buy Allowances
-                        </Button>
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            onClick={() => handlePurchase(seller)}
+                            disabled={!isValidQuantity || !isAuthenticated || user?.role !== 'buyer'}
+                            className="bg-[#2F4B26] hover:bg-[#3d6133] text-[#E1EFE6] disabled:opacity-40 disabled:cursor-not-allowed gap-2 shadow-lg hover:shadow-[0_0_20px_rgba(47,75,38,0.4)] transition-all"
+                          >
+                            <ShoppingCart className="w-4 h-4" />
+                            {user?.role === 'business' ? 'Not Eligible' : 'Buy Allowances'}
+                          </Button>
+                          {!isAuthenticated && (
+                            <div className="text-[10px] text-[#AEB7B3] text-center">Login as Buyer to trade</div>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
