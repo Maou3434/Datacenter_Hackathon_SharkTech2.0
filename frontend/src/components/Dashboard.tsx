@@ -34,17 +34,7 @@ export default function Dashboard() {
   // Generate base data once for mock fallback if needed
   const baseData = useMemo(() => generateGlobalData(), []);
 
-  // Calculate suitability based on applied weights and constraints
-  const processedData = useMemo(() => {
-    if (!showMap) return [];
-
-    // Use real data if available, otherwise use baseData
-    const dataToUse = realData.length > 0 ? realData : baseData;
-
-    return dataToUse.map(location =>
-      calculateSuitability(location, appliedWeights, appliedConstraints)
-    );
-  }, [baseData, realData, appliedWeights, appliedConstraints, showMap]);
+  const dataToUse = useMemo(() => (realData.length > 0 ? realData : baseData), [realData, baseData]);
 
   const handleUpdate = async () => {
     setIsLoading(true);
@@ -60,7 +50,6 @@ export default function Dashboard() {
       setIsLoading(false);
       setAppliedWeights(weights);
       setAppliedConstraints(constraints);
-      setShowMap(true);
     }
   };
 
@@ -69,7 +58,6 @@ export default function Dashboard() {
     setConstraints(DEFAULT_CONSTRAINTS);
     setAppliedWeights(DEFAULT_WEIGHTS);
     setAppliedConstraints(DEFAULT_CONSTRAINTS);
-    setShowMap(false);
     setRealData([]);
   };
 
@@ -94,7 +82,12 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-          <MapView data={processedData} onLocationSelect={setSelectedLocation} />
+          <MapView
+            data={dataToUse}
+            weights={appliedWeights}
+            constraints={appliedConstraints}
+            onLocationSelect={setSelectedLocation}
+          />
         </div>
         <InfoPanel selectedLocation={selectedLocation} weights={appliedWeights} />
       </div>

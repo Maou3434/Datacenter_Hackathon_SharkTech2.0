@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { LocationData } from '../types';
-import { getSuitabilityColor } from '../utils/calculations';
+import React, { useEffect, useRef, useState } from 'react';
+import { LocationData, WeightFactors, Constraints } from '../types';
+import { getSuitabilityColor, calculateSuitability } from '../utils/calculations';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface MapViewProps {
   data: LocationData[];
+  weights: WeightFactors;
+  constraints: Constraints;
   onLocationSelect: (location: LocationData | null) => void;
 }
 
-export default function MapView({ data, onLocationSelect }: MapViewProps) {
+export default function MapView({ data, weights, constraints, onLocationSelect }: MapViewProps) {
   const baseMapRef = useRef<HTMLDivElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -75,36 +77,48 @@ export default function MapView({ data, onLocationSelect }: MapViewProps) {
     return { lat, lng };
   };
 
-  // Draw heatmap overlay
+  // Draw heatmap
   useEffect(() => {
     const canvas = heatmapCanvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     ctx.clearRect(0, 0, dimensions.width, dimensions.height);
 
-    data.forEach(location => {
-      if (location.excluded) return;
+    // Determine decimation (Level of Detail) based on zoom
+    // Higher skip rate when zoomed out
+    const skipRate = zoom < 2 ? 15 : zoom < 3 ? 8 : zoom < 4 ? 3 : 1;
 
+    // Performance optimization: only iterate over a subset of points when zoomed out
+    // and only for those that are likely visible
+    for (let i = 0; i < data.length; i += skipRate) {
+      const location = data[i];
+      if (location.excluded) continue;
+
+      // Quick bounding box check before expensive projection
+      // This helps if the dataset is global but we are zoomed into a continent
       const { x, y } = latLngToPixel(location.lat, location.lng);
 
       if (
-        x < -50 || x > dimensions.width + 50 ||
-        y < -50 || y > dimensions.height + 50 ||
-        isNaN(location.suitability)
+        x < -20 || x > dimensions.width + 20 ||
+        y < -20 || y > dimensions.height + 20
       ) {
-        return;
+        continue;
       }
 
-      const color = getSuitabilityColor(location.suitability, false);
-      const size = Math.max(1, Math.min(4, 1.5 * Math.pow(1.2, zoom - 2)));
+      // Calculate suitability on the fly only for visible points
+      const processed = calculateSuitability(location, weights, constraints);
+      if (processed.suitability === 0) continue;
+
+      const color = getSuitabilityColor(processed.suitability, false);
+      const size = Math.max(1, Math.min(6, 2 * Math.pow(1.2, zoom - 2)));
 
       ctx.fillStyle = color;
       ctx.fillRect(x - size / 2, y - size / 2, size, size);
-    });
-  }, [data, dimensions, center, zoom]);
+    }
+  }, [data, dimensions, center, zoom, weights, constraints]);
 
   // Draw base map tiles
   useEffect(() => {
@@ -199,22 +213,40 @@ export default function MapView({ data, onLocationSelect }: MapViewProps) {
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
+        // Optimized Search: Convert click to Lat/Lng and only check nearby points
+        const { lat: clickLat, lng: clickLng } = pixelToLatLng(mouseX, mouseY);
+
         let closestPoint: LocationData | null = null;
         let minDistance = Infinity;
 
-        data.forEach(location => {
+        // Coarse range filter (approx 50km radius for a roughly 5km grid)
+        const latDelta = 0.5;
+        const lngDelta = 0.5;
+
+        for (let i = 0; i < data.length; i++) {
+          const location = data[i];
+
+          // Performance: Filter by Lat/Lng before calculating pixels
+          if (
+            Math.abs(location.lat - clickLat) > latDelta ||
+            Math.abs(location.lng - clickLng) > lngDelta
+          ) {
+            continue;
+          }
+
           const pos = latLngToPixel(location.lat, location.lng);
           const dist = Math.sqrt(
             Math.pow(pos.x - mouseX, 2) + Math.pow(pos.y - mouseY, 2)
           );
 
-          const detectionRadius = 30; // Increased radius for easier selection
+          const detectionRadius = 30;
 
           if (dist < detectionRadius && dist < minDistance) {
-            closestPoint = location;
+            // Calculate suitability for the selected point
+            closestPoint = calculateSuitability(location, weights, constraints);
             minDistance = dist;
           }
-        });
+        }
 
         onLocationSelect(closestPoint);
       }
