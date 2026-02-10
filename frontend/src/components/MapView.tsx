@@ -159,29 +159,41 @@ export default function MapView({ data, onLocationSelect }: MapViewProps) {
 
   // Mouse handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY, lat: center.lat, lng: center.lng });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
+    if (dragStart.x !== 0 || dragStart.y !== 0) {
       const dx = e.clientX - dragStart.x;
       const dy = e.clientY - dragStart.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
 
-      const { lat: newLat, lng: newLng } = pixelToLatLng(
-        dimensions.width / 2 - dx,
-        dimensions.height / 2 - dy
-      );
+      // Only start dragging if the mouse has moved more than 5 pixels
+      if (!isDragging && distance > 5) {
+        setIsDragging(true);
+      }
 
-      setCenter({
-        lat: Math.max(-85, Math.min(85, newLat)),
-        lng: newLng
-      });
+      if (isDragging) {
+        const { lat: newLat, lng: newLng } = pixelToLatLng(
+          dimensions.width / 2 - dx,
+          dimensions.height / 2 - dy
+        );
+
+        setCenter({
+          lat: Math.max(-85, Math.min(85, newLat)),
+          lng: newLng
+        });
+      }
     }
   };
 
   const handleMouseUp = (e: React.MouseEvent) => {
-    if (!isDragging) {
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If movement was minimal, it's a click even if isDragging was briefly true due to jitter
+    if (!isDragging || distance < 10) {
       const rect = containerRef.current?.getBoundingClientRect();
       if (rect) {
         const mouseX = e.clientX - rect.left;
@@ -192,22 +204,24 @@ export default function MapView({ data, onLocationSelect }: MapViewProps) {
 
         data.forEach(location => {
           const pos = latLngToPixel(location.lat, location.lng);
-          const distance = Math.sqrt(
+          const dist = Math.sqrt(
             Math.pow(pos.x - mouseX, 2) + Math.pow(pos.y - mouseY, 2)
           );
 
-          const detectionRadius = 25; // More forgiving radius for easier clicking
+          const detectionRadius = 30; // Increased radius for easier selection
 
-          if (distance < detectionRadius && distance < minDistance) {
+          if (dist < detectionRadius && dist < minDistance) {
             closestPoint = location;
-            minDistance = distance;
+            minDistance = dist;
           }
         });
 
         onLocationSelect(closestPoint);
       }
     }
+
     setIsDragging(false);
+    setDragStart({ x: 0, y: 0, lat: 20, lng: 0 });
   };
 
   const handleMouseLeave = () => {
@@ -293,31 +307,34 @@ export default function MapView({ data, onLocationSelect }: MapViewProps) {
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-6 right-6 bg-[#1e293b] border border-[#fcfdbf]/40 rounded-xl p-4 shadow-2xl z-[500] ring-1 ring-inset ring-white/10">
+      <div
+        className="absolute bottom-6 right-6 border border-[#fcfdbf]/40 rounded-xl p-4 shadow-2xl z-[500] ring-1 ring-inset ring-white/10"
+        style={{ backgroundColor: '#1e293b', opacity: 1 }}
+      >
         <h4 className="font-bold text-sm mb-3 text-[#f1f5f9] tracking-tight">Suitability Index</h4>
-        <div className="w-12 h-1 bg-gradient-to-r from-[#3b0f70] to-[#fcfdbf] mb-4 rounded-full opacity-80" />
+        <div className="w-12 h-1 bg-gradient-to-r from-[#3b0f70] to-[#fcfdbf] mb-4 rounded-full" />
         <div className="space-y-2.5">
-          <div className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3">
             <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#fcfdbf' }}></div>
-            <span className="text-xs font-bold text-[#cbd5e1]">High (≥80%)</span>
+            <span className="text-xs font-bold text-[#f1f5f9]">High (≥80%)</span>
           </div>
-          <div className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3">
             <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#fe9f6d' }}></div>
-            <span className="text-xs font-bold text-[#cbd5e1]">Good (60-80%)</span>
+            <span className="text-xs font-bold text-[#f1f5f9]">Good (60-80%)</span>
           </div>
-          <div className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3">
             <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#de4968' }}></div>
-            <span className="text-xs font-bold text-[#cbd5e1]">Moderate (50-60%)</span>
+            <span className="text-xs font-bold text-[#f1f5f9]">Moderate (50-60%)</span>
           </div>
-          <div className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3">
             <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#8c2981' }}></div>
-            <span className="text-xs font-bold text-[#cbd5e1]">Low (30-50%)</span>
+            <span className="text-xs font-bold text-[#f1f5f9]">Low (30-50%)</span>
           </div>
-          <div className="flex items-center gap-3 group">
+          <div className="flex items-center gap-3">
             <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#3b0f70' }}></div>
-            <span className="text-xs font-bold text-[#cbd5e1]">Poor (&lt;30%)</span>
+            <span className="text-xs font-bold text-[#f1f5f9]">Poor (&lt;30%)</span>
           </div>
-          <div className="flex items-center gap-3 group border-t border-white/5 pt-2 mt-2">
+          <div className="flex items-center gap-3 border-t border-white/10 pt-2 mt-2">
             <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#AEB7B3' }}></div>
             <span className="text-xs font-bold text-[#94a3b8]">Excluded Area</span>
           </div>
