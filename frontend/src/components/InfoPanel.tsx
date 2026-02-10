@@ -22,7 +22,7 @@ export default function InfoPanel({ selectedLocation, weights }: InfoPanelProps)
               <h3 className="font-bold text-sm mb-2 text-[#f1f5f9]">Heatmap Information</h3>
               <div className="w-16 h-1 bg-[#fcfdbf]/80 mb-3 rounded-full" />
               <p className="text-sm text-[#cbd5e1] leading-relaxed">
-                Bright yellow areas indicate optimal conditions for data center placement.
+                Bright green areas indicate optimal conditions for data center placement.
                 Click on locations for detailed analysis.
               </p>
             </div>
@@ -37,15 +37,15 @@ export default function InfoPanel({ selectedLocation, weights }: InfoPanelProps)
             <h4 className="text-[10px] font-bold uppercase tracking-wider text-[#94a3b8] mb-3">Suitability Key</h4>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-2 rounded-full" style={{ backgroundColor: '#fcfdbf' }}></div>
+                <div className="rounded-full" style={{ width: '16px', height: '8px', backgroundColor: '#22c55e' }}></div>
                 <span className="text-[10px] font-bold text-[#cbd5e1]">High Efficiency</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-2 rounded-full" style={{ backgroundColor: '#de4968' }}></div>
+                <div className="rounded-full" style={{ width: '16px', height: '8px', backgroundColor: '#facc15' }}></div>
                 <span className="text-[10px] font-bold text-[#cbd5e1]">Moderate Potential</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-4 h-2 rounded-full" style={{ backgroundColor: ' #d4c1ebff' }}></div>
+                <div className="rounded-full" style={{ width: '16px', height: '8px', backgroundColor: '#ef4444' }}></div>
                 <span className="text-[10px] font-bold text-[#cbd5e1]">Low Suitability</span>
               </div>
             </div>
@@ -90,7 +90,7 @@ export default function InfoPanel({ selectedLocation, weights }: InfoPanelProps)
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${score.value}%`,
-                    backgroundColor: score.value > 80 ? '#fcfdbf' : score.value > 60 ? '#fe9f6d' : score.value > 40 ? '#de4968' : '#3b0f70'
+                    backgroundColor: score.value > 80 ? '#22c55e' : score.value > 60 ? '#4ade80' : score.value > 40 ? '#facc15' : '#ef4444'
                   }}
                 />
               </div>

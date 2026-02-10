@@ -88,15 +88,15 @@ export function calculateSuitability(
   return { ...location, suitability, excluded: false };
 }
 
-// Magma Colormap Stops (approximation of Matplotlib's magma)
-const MAGMA_STOPS = [
-  { p: 0.0, c: '#000004' },
-  { p: 0.2, c: '#3b0f70' },
-  { p: 0.4, c: '#8c2981' },
-  { p: 0.6, c: '#de4968' },
-  { p: 0.8, c: '#fe9f6d' },
-  { p: 1.0, c: '#fcfdbf' }
+// Suitability Colormap Stops (Red-Yellow-Green)
+const SUITABILITY_STOPS = [
+  { p: 0.0, c: '#ef4444' }, // Poor (Red)
+  { p: 0.25, c: '#f97316' }, // Low (Orange)
+  { p: 0.5, c: '#facc15' }, // Moderate (Yellow)
+  { p: 0.75, c: '#4ade80' }, // Good (Light Green)
+  { p: 1.0, c: '#22c55e' }  // High (Green)
 ];
+
 
 function hexToRgb(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -118,13 +118,13 @@ export function getSuitabilityColor(suitability: number, excluded: boolean): str
   const val = Math.max(0, Math.min(1, suitability));
 
   // Find the two stops to interpolate between
-  let lower = MAGMA_STOPS[0];
-  let upper = MAGMA_STOPS[MAGMA_STOPS.length - 1];
+  let lower = SUITABILITY_STOPS[0];
+  let upper = SUITABILITY_STOPS[SUITABILITY_STOPS.length - 1];
 
-  for (let i = 0; i < MAGMA_STOPS.length - 1; i++) {
-    if (val >= MAGMA_STOPS[i].p && val <= MAGMA_STOPS[i + 1].p) {
-      lower = MAGMA_STOPS[i];
-      upper = MAGMA_STOPS[i + 1];
+  for (let i = 0; i < SUITABILITY_STOPS.length - 1; i++) {
+    if (val >= SUITABILITY_STOPS[i].p && val <= SUITABILITY_STOPS[i + 1].p) {
+      lower = SUITABILITY_STOPS[i];
+      upper = SUITABILITY_STOPS[i + 1];
       break;
     }
   }
