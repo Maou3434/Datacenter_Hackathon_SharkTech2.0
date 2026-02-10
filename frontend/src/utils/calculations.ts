@@ -29,23 +29,10 @@ function generateLocationData(lat: number, lng: number): LocationData {
   const renewable = tempZone > 30 && tempZone < 60 ?
     60 + Math.random() * 35 : 40 + Math.random() * 40;
 
-  // Water availability
-  const water = 30 + Math.random() * 60;
-
-  // Terrain (more mountainous in certain regions)
-  const terrain = tempZone > 20 && tempZone < 50 ?
-    50 + Math.random() * 40 : 60 + Math.random() * 30;
-
-  // Infrastructure (higher near populated areas)
-  const infrastructure = 100 - population * 0.6 + Math.random() * 20;
-
   const scores = {
     environmental,
     population,
-    renewable,
-    water,
-    terrain,
-    infrastructure
+    renewable
   };
 
   return {
@@ -55,8 +42,8 @@ function generateLocationData(lat: number, lng: number): LocationData {
     temperature: 30 - tempZone * 0.4 + Math.random() * 10,
     populationDensity: population > 70 ? 'high' : population > 40 ? 'medium' : 'low',
     solarPotential: renewable > 70 ? 'high' : renewable > 40 ? 'medium' : 'low',
-    waterStress: water < 40 ? 'high' : water < 65 ? 'medium' : 'low',
-    terrain: terrain > 70 ? 'flat' : terrain > 40 ? 'hilly' : 'mountainous',
+    waterStress: 'low', // default
+    terrain: 'flat', // default
     scores
   };
 }
@@ -72,11 +59,9 @@ export function calculateSuitability(
   if (constraints.urbanCores && location.populationDensity === 'high') {
     excluded = true;
   }
-  if (constraints.waterStress && location.waterStress === 'high') {
-    excluded = true;
-  }
+  // Simplified flood risk based on tropical regions
   if (constraints.floodRisk && location.lat < 10 && location.lat > -10) {
-    excluded = true; // Simplified flood risk based on tropical regions
+    excluded = true;
   }
 
   if (excluded) {
@@ -87,10 +72,7 @@ export function calculateSuitability(
   const totalWeight =
     weights.environmental +
     weights.population +
-    weights.renewable +
-    weights.water +
-    weights.terrain +
-    weights.infrastructure;
+    weights.renewable;
 
   if (totalWeight === 0) {
     return { ...location, suitability: 0.5, excluded: false };
@@ -100,10 +82,7 @@ export function calculateSuitability(
   const suitability = (
     ((location.scores.environmental ?? 0) * weights.environmental) +
     ((location.scores.population ?? 0) * weights.population) +
-    ((location.scores.renewable ?? 0) * weights.renewable) +
-    ((location.scores.water ?? 0) * weights.water) +
-    ((location.scores.terrain ?? 0) * weights.terrain) +
-    ((location.scores.infrastructure ?? 0) * weights.infrastructure)
+    ((location.scores.renewable ?? 0) * weights.renewable)
   ) / (totalWeight * 100);
 
   return { ...location, suitability, excluded: false };
@@ -165,12 +144,9 @@ export function getSuitabilityColor(suitability: number, excluded: boolean): str
 
 export function getScenarioDescription(weights: WeightFactors): string {
   const factors = [
-    { name: 'environmental sustainability', value: weights.environmental },
-    { name: 'population proximity', value: weights.population },
-    { name: 'renewable energy', value: weights.renewable },
-    { name: 'water sustainability', value: weights.water },
-    { name: 'terrain feasibility', value: weights.terrain },
-    { name: 'infrastructure', value: weights.infrastructure }
+    { name: 'temperature efficiency', value: weights.environmental },
+    { name: 'low population density', value: weights.population },
+    { name: 'solar potential', value: weights.renewable }
   ];
 
   // Find top 2 priorities

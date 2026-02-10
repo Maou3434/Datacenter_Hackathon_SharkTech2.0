@@ -56,12 +56,9 @@ export default function InfoPanel({ selectedLocation, weights }: InfoPanelProps)
   }
 
   const scores = [
-    { label: 'Environmental', value: selectedLocation.scores.environmental },
-    { label: 'Population', value: selectedLocation.scores.population },
-    { label: 'Renewable', value: selectedLocation.scores.renewable },
-    { label: 'Water', value: selectedLocation.scores.water },
-    { label: 'Terrain', value: selectedLocation.scores.terrain },
-    { label: 'Infrastructure', value: selectedLocation.scores.infrastructure }
+    { label: 'Temperature', value: selectedLocation.scores.environmental },
+    { label: 'Pop Density', value: selectedLocation.scores.population },
+    { label: 'Solar/GHI', value: selectedLocation.scores.renewable }
   ];
 
   return (

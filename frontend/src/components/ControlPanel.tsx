@@ -23,55 +23,39 @@ export default function ControlPanel({
   onUpdate,
   onReset
 }: ControlPanelProps) {
-  
+
   const handleWeightChange = (key: keyof WeightFactors, value: number[]) => {
     onWeightsChange({ ...weights, [key]: value[0] });
   };
-  
+
   const handleConstraintChange = (key: keyof Constraints, checked: boolean) => {
     onConstraintsChange({ ...constraints, [key]: checked });
   };
-  
+
   const weightConfigs = [
-    { 
-      key: 'environmental' as keyof WeightFactors, 
-      label: 'Environmental Impact',
-      description: 'Carbon footprint & climate'
+    {
+      key: 'environmental' as keyof WeightFactors,
+      label: 'Temperature Coeff.',
+      description: 'Cooler climates favored for efficiency'
     },
-    { 
-      key: 'population' as keyof WeightFactors, 
-      label: 'Population Sensitivity',
-      description: 'Distance from population centers'
+    {
+      key: 'population' as keyof WeightFactors,
+      label: 'Population Density',
+      description: 'Lower density favored (land cost/risk)'
     },
-    { 
-      key: 'renewable' as keyof WeightFactors, 
-      label: 'Renewable Energy',
-      description: 'Solar, wind, hydro potential'
-    },
-    { 
-      key: 'water' as keyof WeightFactors, 
-      label: 'Water Sustainability',
-      description: 'Water availability for cooling'
-    },
-    { 
-      key: 'terrain' as keyof WeightFactors, 
-      label: 'Terrain Feasibility',
-      description: 'Flat land for construction'
-    },
-    { 
-      key: 'infrastructure' as keyof WeightFactors, 
-      label: 'Infrastructure',
-      description: 'Network & workforce'
+    {
+      key: 'renewable' as keyof WeightFactors,
+      label: 'Solar Potential (GHI)',
+      description: 'Higher Global Horizontal Irradiance'
     }
   ];
-  
+
   const constraintConfigs = [
     { key: 'urbanCores' as keyof Constraints, label: 'Dense urban cores' },
     { key: 'forests' as keyof Constraints, label: 'Protected land' },
-    { key: 'floodRisk' as keyof Constraints, label: 'Flood-risk zones' },
-    { key: 'waterStress' as keyof Constraints, label: 'Water-stress regions' }
+    { key: 'floodRisk' as keyof Constraints, label: 'Flood-risk zones' }
   ];
-  
+
   return (
     <Card className="w-80 h-full overflow-y-auto p-6 border-r border-[#2F4B26]/20 border-t-0 border-b-0 border-l-0 bg-[#000411] rounded-none">
       <div className="space-y-6">
@@ -82,13 +66,13 @@ export default function ControlPanel({
             Adjust factor priorities
           </p>
         </div>
-        
+
         {/* Weight Sliders */}
         <div className="space-y-6">
           <h3 className="font-bold text-sm text-[#2F4B26] border-b border-[#2F4B26]/20 pb-2 uppercase tracking-wide">
             Prioritize Factors
           </h3>
-          
+
           {weightConfigs.map(config => (
             <div key={config.key} className="space-y-3">
               <div className="flex justify-between items-start">
@@ -102,7 +86,7 @@ export default function ControlPanel({
               </div>
               <Slider
                 value={[weights[config.key]]}
-                onValueChange={(value) => handleWeightChange(config.key, value)}
+                onValueChange={(value: number[]) => handleWeightChange(config.key, value)}
                 max={100}
                 step={5}
                 className="cursor-pointer"
@@ -110,19 +94,19 @@ export default function ControlPanel({
             </div>
           ))}
         </div>
-        
+
         {/* Constraint Toggles */}
         <div className="space-y-4 pt-2">
           <h3 className="font-bold text-sm text-[#2F4B26] border-b border-[#2F4B26]/20 pb-2 uppercase tracking-wide">
             Exclude Areas
           </h3>
-          
+
           {constraintConfigs.map(config => (
             <div key={config.key} className="flex items-center space-x-3 group">
               <Checkbox
                 id={config.key}
                 checked={constraints[config.key]}
-                onCheckedChange={(checked) => 
+                onCheckedChange={(checked: boolean | "indeterminate") =>
                   handleConstraintChange(config.key, checked as boolean)
                 }
                 className="border-2 border-[#2F4B26]/40 data-[state=checked]:bg-[#2F4B26] data-[state=checked]:border-[#2F4B26] rounded"
@@ -136,7 +120,7 @@ export default function ControlPanel({
             </div>
           ))}
         </div>
-        
+
         {/* Action Buttons */}
         <div className="space-y-3 pt-4">
           <Button onClick={onUpdate} className="w-full gap-2 bg-[#2F4B26] hover:bg-[#3d6133] text-[#E1EFE6] border-0 font-semibold rounded-lg shadow-lg shadow-[#2F4B26]/20 hover:shadow-[0_0_30px_rgba(47,75,38,0.5)] transition-all hover:ring-1 hover:ring-white/20" size="lg">

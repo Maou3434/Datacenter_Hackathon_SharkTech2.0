@@ -2,16 +2,12 @@ export interface WeightFactors {
   environmental: number;
   population: number;
   renewable: number;
-  water: number;
-  terrain: number;
-  infrastructure: number;
 }
 
 export interface Constraints {
   urbanCores: boolean;
   forests: boolean;
   floodRisk: boolean;
-  waterStress: boolean;
 }
 
 export interface LocationData {
@@ -27,9 +23,6 @@ export interface LocationData {
     environmental: number;
     population: number;
     renewable: number;
-    water: number;
-    terrain: number;
-    infrastructure: number;
   };
   excluded?: boolean;
 }

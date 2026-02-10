@@ -6,19 +6,15 @@ import { WeightFactors, Constraints, LocationData } from '../types';
 import { generateGlobalData, calculateSuitability } from '../utils/calculations';
 
 const DEFAULT_WEIGHTS: WeightFactors = {
-  environmental: 50,
-  population: 40,
-  renewable: 60,
-  water: 50,
-  terrain: 40,
-  infrastructure: 30
+  environmental: 33,
+  population: 33,
+  renewable: 33
 };
 
 const DEFAULT_CONSTRAINTS: Constraints = {
   urbanCores: false,
   forests: false,
-  floodRisk: false,
-  waterStress: false
+  floodRisk: false
 };
 
 export default function Dashboard() {
