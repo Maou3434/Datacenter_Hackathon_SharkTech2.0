@@ -6,17 +6,15 @@ import { Button } from './ui/button';
 
 interface MapViewProps {
   data: LocationData[];
-  onLocationHover: (location: LocationData | null) => void;
+  onLocationSelect: (location: LocationData | null) => void;
 }
 
-export default function MapView({ data, onLocationHover }: MapViewProps) {
+export default function MapView({ data, onLocationSelect }: MapViewProps) {
   const baseMapRef = useRef<HTMLDivElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [dimensions, setDimensions] = useState({ width: 1000, height: 600 });
-  const [hoveredPoint, setHoveredPoint] = useState<LocationData | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   // Pan and zoom state
   const [center, setCenter] = useState({ lat: 20, lng: 0 });
@@ -38,26 +36,41 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Convert lat/lng to pixel position
+  // Convert lat/lng to pixel position using Web Mercator projection
   const latLngToPixel = (lat: number, lng: number) => {
-    const scale = Math.pow(2, zoom) * 256 / 360;
-    const centerX = dimensions.width / 2;
-    const centerY = dimensions.height / 2;
+    const tileSize = 256;
+    const totalSize = Math.pow(2, zoom) * tileSize;
 
-    const x = centerX + (lng - center.lng) * scale;
-    const y = centerY - (lat - center.lat) * scale * Math.cos(center.lat * Math.PI / 180);
+    const lonToX = (lon: number) => (lon + 180) / 360 * totalSize;
+    const latToY = (l: number) => {
+      const latRad = l * Math.PI / 180;
+      return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * totalSize;
+    };
+
+    const centerX = lonToX(center.lng);
+    const centerY = latToY(center.lat);
+
+    const x = dimensions.width / 2 + (lonToX(lng) - centerX);
+    const y = dimensions.height / 2 + (latToY(lat) - centerY);
 
     return { x, y };
   };
 
-  // Convert pixel to lat/lng
+  // Convert pixel to lat/lng (Inverse Web Mercator)
   const pixelToLatLng = (x: number, y: number) => {
-    const scale = Math.pow(2, zoom) * 256 / 360;
-    const centerX = dimensions.width / 2;
-    const centerY = dimensions.height / 2;
+    const tileSize = 256;
+    const totalSize = Math.pow(2, zoom) * tileSize;
 
-    const lng = center.lng + (x - centerX) / scale;
-    const lat = center.lat - (y - centerY) / (scale * Math.cos(center.lat * Math.PI / 180));
+    const centerX = (center.lng + 180) / 360 * totalSize;
+    const latRadCenter = center.lat * Math.PI / 180;
+    const centerY = (1 - Math.log(Math.tan(latRadCenter) + 1 / Math.cos(latRadCenter)) / Math.PI) / 2 * totalSize;
+
+    const worldX = centerX + (x - dimensions.width / 2);
+    const worldY = centerY + (y - dimensions.height / 2);
+
+    const lng = (worldX / totalSize) * 360 - 180;
+    const n = Math.PI - 2 * Math.PI * worldY / totalSize;
+    const lat = 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
 
     return { lat, lng };
   };
@@ -70,27 +83,22 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
     ctx.clearRect(0, 0, dimensions.width, dimensions.height);
 
-    // Draw gradient heatmap
     data.forEach(location => {
       if (location.excluded) return;
 
       const { x, y } = latLngToPixel(location.lat, location.lng);
 
-      // Skip if out of view or invalid data
       if (
-        x < -100 || x > dimensions.width + 100 ||
-        y < -100 || y > dimensions.height + 100 ||
+        x < -50 || x > dimensions.width + 50 ||
+        y < -50 || y > dimensions.height + 50 ||
         isNaN(location.suitability)
       ) {
         return;
       }
 
       const color = getSuitabilityColor(location.suitability, false);
-
-      // Calculate pixel size based on zoom for a "tightly knit" look
       const size = Math.max(1, Math.min(4, 1.5 * Math.pow(1.2, zoom - 2)));
 
       ctx.fillStyle = color;
@@ -106,23 +114,30 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
     container.innerHTML = '';
 
     const tileSize = 256;
-    const numTiles = Math.pow(2, Math.floor(zoom));
-    const scale = Math.pow(2, zoom - Math.floor(zoom));
+    const totalTiles = Math.pow(2, Math.floor(zoom));
+    const factionalZoom = zoom - Math.floor(zoom);
+    const scale = Math.pow(2, factionalZoom);
 
-    // Calculate which tiles to load
-    const centerTileX = ((center.lng + 180) / 360) * numTiles;
-    const centerTileY = ((1 - Math.log(Math.tan(center.lat * Math.PI / 180) + 1 / Math.cos(center.lat * Math.PI / 180)) / Math.PI) / 2) * numTiles;
+    // Standard Mercator projection for tiles
+    const lonToX = (lon: number, z: number) => (lon + 180) / 360 * Math.pow(2, z);
+    const latToY = (lat: number, z: number) => {
+      const latRad = lat * Math.PI / 180;
+      return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * Math.pow(2, z);
+    };
 
-    const tilesX = Math.ceil(dimensions.width / (tileSize * scale)) + 2;
-    const tilesY = Math.ceil(dimensions.height / (tileSize * scale)) + 2;
+    const centerTileX = lonToX(center.lng, Math.floor(zoom));
+    const centerTileY = latToY(center.lat, Math.floor(zoom));
 
-    const startTileX = Math.floor(centerTileX - tilesX / 2);
-    const startTileY = Math.floor(centerTileY - tilesY / 2);
+    const tilesAcross = Math.ceil(dimensions.width / (tileSize * scale)) + 2;
+    const tilesDown = Math.ceil(dimensions.height / (tileSize * scale)) + 2;
 
-    for (let x = startTileX; x < startTileX + tilesX; x++) {
-      for (let y = startTileY; y < startTileY + tilesY; y++) {
-        const tileX = ((x % numTiles) + numTiles) % numTiles;
-        const tileY = Math.max(0, Math.min(numTiles - 1, y));
+    const startX = Math.floor(centerTileX - tilesAcross / 2);
+    const startY = Math.floor(centerTileY - tilesDown / 2);
+
+    for (let x = startX; x < startX + tilesAcross; x++) {
+      for (let y = startY; y < startY + tilesDown; y++) {
+        const tileX = ((x % totalTiles) + totalTiles) % totalTiles;
+        const tileY = Math.max(0, Math.min(totalTiles - 1, y));
 
         const img = document.createElement('img');
         img.src = `https://tile.openstreetmap.org/${Math.floor(zoom)}/${tileX}/${tileY}.png`;
@@ -153,53 +168,50 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
       const dx = e.clientX - dragStart.x;
       const dy = e.clientY - dragStart.y;
 
-      const scale = Math.pow(2, zoom) * 256 / 360;
-      const deltaLng = -dx / scale;
-      const deltaLat = dy / (scale * Math.cos(center.lat * Math.PI / 180));
-
-      setCenter({
-        lat: Math.max(-85, Math.min(85, dragStart.lat + deltaLat)),
-        lng: dragStart.lng + deltaLng
-      });
-    }
-
-    // Find closest point for hover
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    let closestPoint: LocationData | null = null;
-    let minDistance = Infinity;
-
-    data.forEach(location => {
-      const pos = latLngToPixel(location.lat, location.lng);
-      const distance = Math.sqrt(
-        Math.pow(pos.x - mouseX, 2) + Math.pow(pos.y - mouseY, 2)
+      const { lat: newLat, lng: newLng } = pixelToLatLng(
+        dimensions.width / 2 - dx,
+        dimensions.height / 2 - dy
       );
 
-      const detectionRadius = 25 * Math.pow(1.3, zoom - 2);
-
-      if (distance < detectionRadius && distance < minDistance) {
-        closestPoint = location;
-        minDistance = distance;
-      }
-    });
-
-    setHoveredPoint(closestPoint);
-    onLocationHover(closestPoint);
-    setTooltipPos({ x: e.clientX, y: e.clientY });
+      setCenter({
+        lat: Math.max(-85, Math.min(85, newLat)),
+        lng: newLng
+      });
+    }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isDragging) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        let closestPoint: LocationData | null = null;
+        let minDistance = Infinity;
+
+        data.forEach(location => {
+          const pos = latLngToPixel(location.lat, location.lng);
+          const distance = Math.sqrt(
+            Math.pow(pos.x - mouseX, 2) + Math.pow(pos.y - mouseY, 2)
+          );
+
+          const detectionRadius = 25; // More forgiving radius for easier clicking
+
+          if (distance < detectionRadius && distance < minDistance) {
+            closestPoint = location;
+            minDistance = distance;
+          }
+        });
+
+        onLocationSelect(closestPoint);
+      }
+    }
     setIsDragging(false);
   };
 
   const handleMouseLeave = () => {
     setIsDragging(false);
-    setHoveredPoint(null);
-    onLocationHover(null);
   };
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -252,59 +264,12 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
         }}
       />
 
-      {/* Tooltip */}
-      {hoveredPoint && (
-        <div
-          className="fixed bg-[#160C28] border border-[#2F4B26]/50 shadow-2xl shadow-[#2F4B26]/20 rounded-xl p-4 text-sm z-[1000] pointer-events-none backdrop-blur-xl"
-          style={{
-            left: tooltipPos.x + 20,
-            top: tooltipPos.y + 20,
-            maxWidth: '280px'
-          }}
-        >
-          <div className="space-y-2">
-            <div className="flex items-center justify-between border-b border-[#2F4B26]/30 pb-2">
-              <span className="font-bold text-[#E1EFE6] text-xs">Suitability Score</span>
-              <span className="text-2xl font-bold text-[#2F4B26]">
-                {(hoveredPoint.suitability * 100).toFixed(0)}%
-              </span>
-            </div>
-            {hoveredPoint.excluded && (
-              <div className="text-red-400 font-bold text-xs bg-red-500/10 px-2 py-1 border border-red-500/30 rounded">
-                ⚠ Excluded Area
-              </div>
-            )}
-            <div className="grid grid-cols-[100px,1fr] gap-x-3 gap-y-1.5 text-xs">
-              <div className="text-[#AEB7B3] font-semibold">Location:</div>
-              <div className="font-bold text-[#E1EFE6]">
-                {hoveredPoint.lat.toFixed(1)}°, {hoveredPoint.lng.toFixed(1)}°
-              </div>
-
-              <div className="text-[#AEB7B3] font-semibold">Temperature:</div>
-              <div className="font-bold text-[#E1EFE6]">{hoveredPoint.temperature.toFixed(1)}°C</div>
-
-              <div className="text-[#AEB7B3] font-semibold">Population:</div>
-              <div className="font-bold text-[#E1EFE6]">{hoveredPoint.populationDensity}</div>
-
-              <div className="text-[#AEB7B3] font-semibold">Solar:</div>
-              <div className="font-bold text-[#E1EFE6]">{hoveredPoint.solarPotential}</div>
-
-              <div className="text-[#AEB7B3] font-semibold">Water:</div>
-              <div className="font-bold text-[#E1EFE6]">{hoveredPoint.waterStress}</div>
-
-              <div className="text-[#AEB7B3] font-semibold">Terrain:</div>
-              <div className="font-bold text-[#E1EFE6]">{hoveredPoint.terrain}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Zoom controls */}
       <div className="absolute top-6 right-6 flex flex-col gap-2 z-[500]">
         <Button
           size="icon"
           variant="secondary"
-          className="bg-[#160C28] border border-[#2F4B26]/30 shadow-xl hover:bg-[#2F4B26]/20 hover:border-[#2F4B26] text-[#E1EFE6] rounded-lg backdrop-blur-xl"
+          className="bg-[#1e293b] border border-[#fcfdbf]/30 shadow-xl hover:bg-[#fcfdbf]/20 hover:border-[#fcfdbf] text-[#f1f5f9] rounded-lg backdrop-blur-xl"
           onClick={handleZoomIn}
         >
           <ZoomIn className="w-5 h-5" />
@@ -312,7 +277,7 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
         <Button
           size="icon"
           variant="secondary"
-          className="bg-[#160C28] border border-[#2F4B26]/30 shadow-xl hover:bg-[#2F4B26]/20 hover:border-[#2F4B26] text-[#E1EFE6] rounded-lg backdrop-blur-xl"
+          className="bg-[#1e293b] border border-[#fcfdbf]/30 shadow-xl hover:bg-[#fcfdbf]/20 hover:border-[#fcfdbf] text-[#f1f5f9] rounded-lg backdrop-blur-xl"
           onClick={handleZoomOut}
         >
           <ZoomOut className="w-5 h-5" />
@@ -320,7 +285,7 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
         <Button
           size="icon"
           variant="secondary"
-          className="bg-[#160C28] border border-[#2F4B26]/30 shadow-xl hover:bg-[#2F4B26]/20 hover:border-[#2F4B26] text-[#E1EFE6] rounded-lg backdrop-blur-xl"
+          className="bg-[#1e293b] border border-[#fcfdbf]/30 shadow-xl hover:bg-[#fcfdbf]/20 hover:border-[#fcfdbf] text-[#f1f5f9] rounded-lg backdrop-blur-xl"
           onClick={handleReset}
         >
           <Maximize2 className="w-5 h-5" />
@@ -328,48 +293,48 @@ export default function MapView({ data, onLocationHover }: MapViewProps) {
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-6 right-6 bg-[#160C28]/90 border border-[#2F4B26]/30 rounded-xl p-4 shadow-xl z-[500] backdrop-blur-xl">
-        <h4 className="font-bold text-sm mb-3 text-[#E1EFE6]">Suitability</h4>
-        <div className="w-12 h-0.5 bg-[#fcfdbf] mb-3 rounded-full" />
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#fcfdbf' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">High (≥80%)</span>
+      <div className="absolute bottom-6 right-6 bg-[#1e293b] border border-[#fcfdbf]/40 rounded-xl p-4 shadow-2xl z-[500] ring-1 ring-inset ring-white/10">
+        <h4 className="font-bold text-sm mb-3 text-[#f1f5f9] tracking-tight">Suitability Index</h4>
+        <div className="w-12 h-1 bg-gradient-to-r from-[#3b0f70] to-[#fcfdbf] mb-4 rounded-full opacity-80" />
+        <div className="space-y-2.5">
+          <div className="flex items-center gap-3 group">
+            <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#fcfdbf' }}></div>
+            <span className="text-xs font-bold text-[#cbd5e1]">High (≥80%)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#fe9f6d' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Good (60-80%)</span>
+          <div className="flex items-center gap-3 group">
+            <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#fe9f6d' }}></div>
+            <span className="text-xs font-bold text-[#cbd5e1]">Good (60-80%)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#de4968' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Moderate (50-60%)</span>
+          <div className="flex items-center gap-3 group">
+            <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#de4968' }}></div>
+            <span className="text-xs font-bold text-[#cbd5e1]">Moderate (50-60%)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#8c2981' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Low (30-50%)</span>
+          <div className="flex items-center gap-3 group">
+            <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#8c2981' }}></div>
+            <span className="text-xs font-bold text-[#cbd5e1]">Low (30-50%)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#3b0f70' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Poor (&lt;30%)</span>
+          <div className="flex items-center gap-3 group">
+            <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#3b0f70' }}></div>
+            <span className="text-xs font-bold text-[#cbd5e1]">Poor (&lt;30%)</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-3 rounded-sm" style={{ backgroundColor: '#AEB7B3' }}></div>
-            <span className="text-xs font-semibold text-[#AEB7B3]">Excluded</span>
+          <div className="flex items-center gap-3 group border-t border-white/5 pt-2 mt-2">
+            <div className="w-6 h-3.5 rounded-sm shadow-sm ring-1 ring-black/20" style={{ backgroundColor: '#AEB7B3' }}></div>
+            <span className="text-xs font-bold text-[#94a3b8]">Excluded Area</span>
           </div>
         </div>
       </div>
 
       {/* Map controls hint */}
-      <div className="absolute top-6 left-6 bg-[#160C28] border border-[#2F4B26]/30 rounded-xl px-4 py-3 shadow-xl text-xs z-[500] backdrop-blur-xl">
-        <div className="font-bold text-sm mb-2 text-[#E1EFE6]">Controls</div>
-        <div className="w-12 h-0.5 bg-[#2F4B26] mb-2 rounded-full" />
-        <div className="text-[#AEB7B3] space-y-1 font-medium">
+      <div className="absolute top-6 left-6 bg-[#1e293b] border border-[#fcfdbf]/30 rounded-xl px-4 py-3 shadow-xl text-xs z-[500] backdrop-blur-xl ring-1 ring-white/5">
+        <div className="font-bold text-sm mb-2 text-[#f1f5f9] tracking-tight">Controls</div>
+        <div className="w-12 h-1 bg-[#fcfdbf]/40 mb-2 rounded-full" />
+        <div className="text-[#cbd5e1] space-y-1.5 font-medium">
           <div>→ Drag to pan</div>
           <div>→ Scroll to zoom</div>
-          <div>→ Hover for details</div>
+          <div>→ Click for details</div>
         </div>
-        <div className="mt-3 pt-2 border-t border-[#2F4B26]/20 text-[#AEB7B3] font-semibold">
-          Zoom: <span className="text-[#2F4B26]">{zoom.toFixed(1)}x</span>
+        <div className="mt-3 pt-2 border-t border-white/5 text-[#cbd5e1] font-semibold">
+          Zoom: <span className="text-[#fcfdbf]">{zoom.toFixed(1)}x</span>
         </div>
       </div>
 

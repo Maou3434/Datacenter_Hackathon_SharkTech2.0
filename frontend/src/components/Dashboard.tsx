@@ -26,7 +26,7 @@ export default function Dashboard() {
   const [constraints, setConstraints] = useState<Constraints>(DEFAULT_CONSTRAINTS);
   const [appliedWeights, setAppliedWeights] = useState<WeightFactors>(DEFAULT_WEIGHTS);
   const [appliedConstraints, setAppliedConstraints] = useState<Constraints>(DEFAULT_CONSTRAINTS);
-  const [hoveredLocation, setHoveredLocation] = useState<LocationData | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [realData, setRealData] = useState<LocationData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -94,9 +94,9 @@ export default function Dashboard() {
               </div>
             </div>
           )}
-          <MapView data={processedData} onLocationHover={setHoveredLocation} />
+          <MapView data={processedData} onLocationSelect={setSelectedLocation} />
         </div>
-        <InfoPanel hoveredLocation={hoveredLocation} weights={appliedWeights} />
+        <InfoPanel selectedLocation={selectedLocation} weights={appliedWeights} />
       </div>
     </div>
   );
