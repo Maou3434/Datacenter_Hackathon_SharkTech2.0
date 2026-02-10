@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router';
+import { useAuth } from '../auth/AuthProvider';
 import { Info, BookOpen, MapPin, LayoutDashboard, Home, ShoppingCart } from 'lucide-react';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
@@ -6,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 export default function TopNavigation() {
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';
+  const auth = useAuth();
   
   return (
     <nav className="bg-[#000411] border-b border-[#2F4B26]/20 px-6 py-4 flex items-center justify-between backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
@@ -96,6 +98,15 @@ export default function TopNavigation() {
             Marketplace
           </Button>
         </Link>
+        {/* Auth status */}
+        {auth?.user && (
+          <div className="flex items-center gap-2">
+            <img src={auth.user.picture} alt={auth.user.name} className="w-8 h-8 rounded-full" />
+            <Button variant="ghost" size="sm" onClick={auth.signOut} className="text-[#AEB7B3]">
+              Sign out
+            </Button>
+          </div>
+        )}
       </div>
     </nav>
   );

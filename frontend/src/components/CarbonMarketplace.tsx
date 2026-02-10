@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Alert, AlertDescription } from './ui/alert';
-import { useAuth, UserRole } from '../context/AuthContext';
+import { useAuth, UserRole } from '../auth/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Label } from './ui/label';
 
@@ -85,13 +85,13 @@ const INITIAL_REGIONS_DATA: Record<string, RegionData> = {
 };
 
 export default function CarbonMarketplace() {
-  const { user, login, logout, isAuthenticated } = useAuth();
+  const { user, signOut: logout, isAuthenticated } = useAuth();
   const [regions, setRegions] = useState<Record<string, RegionData>>(INITIAL_REGIONS_DATA);
   const [selectedRegion, setSelectedRegion] = useState<string>('northern-europe');
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [sortBy, setSortBy] = useState<'price' | 'quantity'>('price');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
+
   // Publish form state
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [publishForm, setPublishForm] = useState({
@@ -138,7 +138,7 @@ export default function CarbonMarketplace() {
         const region = { ...next[selectedRegion] };
         const sellers = [...region.sellers];
         const sellerIndex = sellers.findIndex(s => s.id === seller.id);
-        
+
         if (sellerIndex > -1) {
           sellers[sellerIndex] = {
             ...sellers[sellerIndex],
@@ -153,7 +153,7 @@ export default function CarbonMarketplace() {
 
       // Reset quantity input
       setQuantities(prev => ({ ...prev, [seller.id]: 0 }));
-      
+
       alert(`Success! Purchase of ${formatNumber(quantity)} tons CO₂ from ${seller.businessName} complete.`);
     }
   };
@@ -166,12 +166,12 @@ export default function CarbonMarketplace() {
       setRegions(prev => {
         const next = { ...prev };
         const region = { ...next[selectedRegion] };
-        
+
         // Use a stable ID if possible, but random is fine for this hackathon
         const newSeller: Seller = {
           id: `new-${Date.now()}`,
           businessName: user!.businessName,
-          industry: 'Industrial/Tech', 
+          industry: 'Industrial/Tech',
           allowancesAvailable: allowancesNum,
           pricePerTon: priceNum
         };
@@ -182,7 +182,7 @@ export default function CarbonMarketplace() {
         next[selectedRegion] = region;
         return next;
       });
-      
+
       setIsPublishModalOpen(false);
       setPublishForm({ allowances: '', price: '' });
     }
@@ -203,7 +203,7 @@ export default function CarbonMarketplace() {
                 <p className="text-[#AEB7B3] mt-1">Fixed-price trading platform for regional carbon allowances</p>
               </div>
             </div>
-            
+
             <Alert className="bg-[#160C28]/60 border-[#2F4B26]/30 backdrop-blur-sm">
               <AlertCircle className="h-4 w-4 text-[#2F4B26]" />
               <AlertDescription className="text-[#AEB7B3] text-sm">
@@ -213,26 +213,7 @@ export default function CarbonMarketplace() {
           </div>
 
           <div className="flex flex-wrap gap-3 items-center">
-            {!isAuthenticated ? (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={() => login('buyer')}
-                  className="border-[#2F4B26]/40 text-[#E1EFE6] hover:bg-[#2F4B26]/20"
-                >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Mock Login: Buyer
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => login('business', 'biz-1', 'Business Owner', 'EcoTech Solutions')}
-                  className="border-[#2F4B26]/40 text-[#E1EFE6] hover:bg-[#2F4B26]/20"
-                >
-                  <LogIn className="w-4 h-4 mr-2" />
-                  Mock Login: Business
-                </Button>
-              </>
-            ) : (
+            {isAuthenticated && (
               <div className="flex items-center gap-4 bg-[#160C28]/60 p-2 pl-4 rounded-lg border border-[#2F4B26]/20">
                 <div className="text-right">
                   <div className="text-xs text-[#AEB7B3] uppercase font-bold tracking-tighter">Logged in as</div>
@@ -243,7 +224,7 @@ export default function CarbonMarketplace() {
                 </Button>
               </div>
             )}
-            
+
             {user?.role === 'business' && (
               <Dialog open={isPublishModalOpen} onOpenChange={setIsPublishModalOpen}>
                 <DialogTrigger asChild>
@@ -266,23 +247,23 @@ export default function CarbonMarketplace() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="allowances">Additional Quantity (tons)</Label>
-                        <Input 
-                          id="allowances" 
-                          type="number" 
+                        <Input
+                          id="allowances"
+                          type="number"
                           placeholder="e.g. 500"
                           value={publishForm.allowances}
-                          onChange={e => setPublishForm({...publishForm, allowances: e.target.value})}
+                          onChange={e => setPublishForm({ ...publishForm, allowances: e.target.value })}
                           className="bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6]"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="price">Sale Price (₹/ton)</Label>
-                        <Input 
-                          id="price" 
-                          type="number" 
+                        <Input
+                          id="price"
+                          type="number"
                           placeholder="e.g. 7500"
                           value={publishForm.price}
-                          onChange={e => setPublishForm({...publishForm, price: e.target.value})}
+                          onChange={e => setPublishForm({ ...publishForm, price: e.target.value })}
                           className="bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6]"
                         />
                       </div>
@@ -316,7 +297,7 @@ export default function CarbonMarketplace() {
                 </SelectContent>
               </Select>
               <Badge variant="outline" className="h-10 px-4 border-[#2F4B26]/30 text-[#AEB7B3] items-center flex">
-                 Region Market Active
+                Region Market Active
               </Badge>
             </div>
           </div>
@@ -351,7 +332,7 @@ export default function CarbonMarketplace() {
                 {utilizationPercentage.toFixed(1)}%
               </div>
               <div className="h-2 bg-[#000411] overflow-hidden mt-3">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-[#2F4B26] to-[#3d6133] shadow-[0_0_10px_rgba(47,75,38,0.5)] transition-all duration-500"
                   style={{ width: `${utilizationPercentage}%` }}
                 />
@@ -391,7 +372,7 @@ export default function CarbonMarketplace() {
                   <TableHead className="text-[#AEB7B3] font-semibold">Business / Entity</TableHead>
                   <TableHead className="text-[#AEB7B3] font-semibold">Industry</TableHead>
                   <TableHead className="text-[#AEB7B3] font-semibold">
-                    <button 
+                    <button
                       onClick={() => handleSort('quantity')}
                       className="flex items-center gap-2 hover:text-[#E1EFE6] transition-colors"
                     >
@@ -400,7 +381,7 @@ export default function CarbonMarketplace() {
                     </button>
                   </TableHead>
                   <TableHead className="text-[#AEB7B3] font-semibold">
-                    <button 
+                    <button
                       onClick={() => handleSort('price')}
                       className="flex items-center gap-2 hover:text-[#E1EFE6] transition-colors"
                     >
@@ -420,8 +401,8 @@ export default function CarbonMarketplace() {
                   const exceedsAvailable = quantity > seller.allowancesAvailable;
 
                   return (
-                    <TableRow 
-                      key={seller.id} 
+                    <TableRow
+                      key={seller.id}
                       className="border-b border-[#2F4B26]/10 hover:bg-[#2F4B26]/10 transition-colors"
                     >
                       <TableCell className="font-medium text-[#E1EFE6]">
@@ -460,9 +441,8 @@ export default function CarbonMarketplace() {
                             placeholder="Enter tons"
                             value={quantities[seller.id] || ''}
                             onChange={(e) => handleQuantityChange(seller.id, e.target.value)}
-                            className={`w-32 bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6] focus:border-[#2F4B26] focus:ring-[#2F4B26] ${
-                              exceedsAvailable ? 'border-red-500/50' : ''
-                            }`}
+                            className={`w-32 bg-[#000411]/60 border-[#2F4B26]/40 text-[#E1EFE6] focus:border-[#2F4B26] focus:ring-[#2F4B26] ${exceedsAvailable ? 'border-red-500/50' : ''
+                              }`}
                           />
                           {exceedsAvailable && (
                             <div className="text-xs text-red-400">Exceeds available</div>
@@ -499,8 +479,8 @@ export default function CarbonMarketplace() {
             <div className="space-y-2">
               <h3 className="text-sm font-semibold text-[#E1EFE6] uppercase tracking-wider">About This Marketplace</h3>
               <p className="text-sm text-[#AEB7B3] leading-relaxed">
-                This marketplace simulates regional carbon allowance trading to help data center planners evaluate carbon costs during site selection. 
-                Prices are fixed (not auction-based), and partial purchases are supported. All data represents modeled market conditions 
+                This marketplace simulates regional carbon allowance trading to help data center planners evaluate carbon costs during site selection.
+                Prices are fixed (not auction-based), and partial purchases are supported. All data represents modeled market conditions
                 based on regional carbon policies and availability projections.
               </p>
             </div>

@@ -8,3 +8,7 @@ matplotlib
 streamlit
 pyproj
 shapely
+Flask
+flask-cors
+requests
+python-dotenv

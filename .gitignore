@@ -1,5 +1,62 @@
 dc_env/
 output/
-*/__pycache__
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+env/
+.venv/
+.venv
+
+# Data
 data/raw/*
+
+# Frontend
 node_modules/
+frontend/.env
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+
+# Build/Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+*.log
+client_secret_*.json
