@@ -150,8 +150,11 @@ export default function MapView({ data, weights, constraints, onLocationSelect }
 
     for (let x = startX; x < startX + tilesAcross; x++) {
       for (let y = startY; y < startY + tilesDown; y++) {
-        const tileX = ((x % totalTiles) + totalTiles) % totalTiles;
-        const tileY = Math.max(0, Math.min(totalTiles - 1, y));
+        if (x < 0 || x >= totalTiles) continue;
+        if (y < 0 || y >= totalTiles) continue;
+
+        const tileX = x;
+        const tileY = y;
 
         const img = document.createElement('img');
         img.src = `https://tile.openstreetmap.org/${Math.floor(zoom)}/${tileX}/${tileY}.png`;
@@ -195,7 +198,7 @@ export default function MapView({ data, weights, constraints, onLocationSelect }
 
         setCenter({
           lat: Math.max(-85, Math.min(85, newLat)),
-          lng: newLng
+          lng: Math.max(-180, Math.min(180, newLng))
         });
       }
     }
@@ -373,19 +376,6 @@ export default function MapView({ data, weights, constraints, onLocationSelect }
         </div>
       </div>
 
-      {/* Map controls hint */}
-      <div className="absolute top-6 left-6 bg-[#1e293b] border border-[#fcfdbf]/30 rounded-xl px-4 py-3 shadow-xl text-xs z-[500] backdrop-blur-xl ring-1 ring-white/5">
-        <div className="font-bold text-sm mb-2 text-[#f1f5f9] tracking-tight">Controls</div>
-        <div className="w-12 h-1 bg-[#fcfdbf]/40 mb-2 rounded-full" />
-        <div className="text-[#cbd5e1] space-y-1.5 font-medium">
-          <div>→ Drag to pan</div>
-          <div>→ Scroll to zoom</div>
-          <div>→ Click for details</div>
-        </div>
-        <div className="mt-3 pt-2 border-t border-white/5 text-[#cbd5e1] font-semibold">
-          Zoom: <span className="text-[#fcfdbf]">{zoom.toFixed(1)}x</span>
-        </div>
-      </div>
 
       {/* Attribution */}
       <div className="absolute bottom-2 left-2 text-[10px] text-[#AEB7B3]/60 bg-[#000411]/80 px-2 py-1 rounded z-[500]">
